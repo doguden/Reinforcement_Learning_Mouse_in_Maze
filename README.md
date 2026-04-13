@@ -1,23 +1,48 @@
+## NeuroMaze
+A reinforcement learning training environment featuring a mouse navigating through a 2D maze with adjustable difficulty levels. Designed for teaching purposes.
 
-A reinforcement learning example, perfect for teaching the concept. 
-A mouse in a maze with adjustable difficulties.
-The mouse can see his surroundings and has the knowledge of X and Y coordinates.
-Periodic boundary on X and continuous on Y, 30x120 squares.
-The models starts with a basic NN but more complex sequential methods can also be adopted.
-<img width="1849" height="925" alt="image" src="https://github.com/user-attachments/assets/54cba1d2-676c-401f-aa8d-24a5b4b4c27f" />
+   ![NeuroMaze Interface](untitled.png)
 
-Designed to study model convergence and hyperparameters.
+## Features
+
+- **Interactive Maze Environment**: 30×120 grid with periodic boundary conditions on X-axis
+- **Real-time Neural Network Visualization**: Watch the agent's brain learn in real-time  
+- **Configurable Difficulty Levels**: Novice through Insane
+- **Adjustable Neural Network Architecture**: Control the depth of hidden layers
+- **Training Analytics**: Track reward accumulation and episode progress with trend analysis
+- **Flexible Speed Controls**: Adjust simulation speed from 1-100%
+
+
+
+## How It Works
+
+The agent perceives the maze environment through:
+- 6 directional sensors (4-cell range)
+- Current X and Y coordinates
+
+It learns via Q-learning with a neural network approximator and optimizes its navigation strategy over multiple episodes.
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
+**Prerequisites:** Node.js 18+
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. Clone the repository and install dependencies:
+   ```bash
+   npm install
+   ```
 
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
 
-doguden@gmail.com
-2026
+3. Open your browser to `http://localhost:3000`
+
+## Building for Production
+
+```bash
+npm run build
+```
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

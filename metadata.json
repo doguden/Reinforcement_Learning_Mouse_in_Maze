@@ -1,5 +1,5 @@
 {
-  "name": "NeuroMaze: RL Mouse Trainer",
-  "description": "A 2D maze with periodic boundaries where a mouse learns to navigate using reinforcement learning, featuring real-time neural network visualization.",
+  "name": "NeuroMaze",
+  "description": "An interactive reinforcement learning environment where an agent learns to navigate a 2D maze with real-time neural network visualization and training analytics.",
   "requestFramePermissions": []
 }
