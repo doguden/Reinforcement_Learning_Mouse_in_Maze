@@ -36,11 +36,6 @@ It learns via Q-learning with a neural network approximator and optimizes its na
 
 3. Open your browser to `http://localhost:3000`
 
-## Building for Production
-
-```bash
-npm run build
-```
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
