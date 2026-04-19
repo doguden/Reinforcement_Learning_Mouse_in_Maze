@@ -1,7 +1,7 @@
 ## NeuroMaze
 A reinforcement learning training environment featuring a mouse navigating through a 2D maze with adjustable difficulty levels. Designed for teaching purposes.
 
-   ![NeuroMaze Interface](/assets/images/untitled.png)
+   ![NeuroMaze Interface](/assets/images/Untitled.png)
 
 ## Features
 
