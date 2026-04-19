@@ -44,5 +44,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Future steps
 -Convert this preliminiary reinformcement learning method to sequential series that preserves the previous one or two or more moves in memory.
+
 -Test RNNs, LSTMs.
+
+-
 
