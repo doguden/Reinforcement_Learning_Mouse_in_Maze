@@ -3,9 +3,9 @@ import { Maze } from './lib/maze';
 import { RLAgent } from './lib/agent';
 import { MazeCanvas } from './components/MazeCanvas';
 import { BrainVisualizer } from './components/BrainVisualizer';
-import { Point, Direction, TrainingMetrics, Difficulty } from './types';
+import { Point, Direction, TrainingMetrics, Difficulty, ActivationFunction, RewardFunction } from './types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Play, Pause, RotateCcw, Brain, BarChart3, Settings2, Gauge } from 'lucide-react';
+import { Play, Pause, RotateCcw, Brain, BarChart3, Settings2, Gauge, Zap } from 'lucide-react';
 
 const MAZE_WIDTH = 30;
 const VIEWPORT_HEIGHT = 60;
@@ -19,11 +19,25 @@ const DIFFICULTY_CONFIG = {
   INSANE: { height: 120, label: 'Insane' }
 };
 
+const ACTIVATION_CONFIG: Record<ActivationFunction, string> = {
+  tanh: 'Tanh',
+  relu: 'ReLU',
+  sigmoid: 'Sigmoid'
+};
+
+const REWARD_CONFIG: Record<RewardFunction, string> = {
+  standard: 'Standard',
+  sparse: 'Sparse',
+  shaping: 'Shaping'
+};
+
 export default function App() {
   const [difficulty, setDifficulty] = useState<Difficulty>('MEDIUM');
   const [hiddenLayers, setHiddenLayers] = useState<number>(2);
+  const [activationFunction, setActivationFunction] = useState<ActivationFunction>('tanh');
+  const [rewardFunction, setRewardFunction] = useState<RewardFunction>('standard');
   const [maze, setMaze] = useState(() => new Maze(MAZE_WIDTH, DIFFICULTY_CONFIG['MEDIUM'].height, 'MEDIUM'));
-  const [agent, setAgent] = useState(() => new RLAgent([12, 8]));
+  const [agent, setAgent] = useState(() => new RLAgent([12, 8], 'tanh'));
   const [mousePos, setMousePos] = useState<Point>({ x: Math.floor(MAZE_WIDTH / 2), y: 0 });
   const [mouseDir, setMouseDir] = useState<Direction>('DOWN');
   const [isRunning, setIsRunning] = useState(false);
@@ -33,6 +47,31 @@ export default function App() {
   const [currentEpisode, setCurrentEpisode] = useState(1);
   const [episodeReward, setEpisodeReward] = useState(0);
   const [steps, setSteps] = useState(0);
+
+  // Reward function implementations
+  const calculateReward = useCallback((
+    currentY: number,
+    previousY: number,
+    isGoal: boolean,
+    isCollision: boolean,
+    mazeHeight: number
+  ): number => {
+    if (isCollision) {
+      return rewardFunction === 'sparse' ? -1 : -5;
+    }
+    
+    if (isGoal) {
+      return rewardFunction === 'sparse' ? 1 : 500;
+    }
+
+    let reward = rewardFunction === 'sparse' ? 0 : -1;
+    
+    if (currentY > previousY) {
+      reward += rewardFunction === 'sparse' ? 1 : 2;
+    }
+    
+    return reward;
+  }, [rewardFunction]);
 
   // Helper for linear regression
   const getTrendLine = (data: any[], key: string) => {
@@ -98,7 +137,25 @@ export default function App() {
   const handleDepthChange = (depth: number) => {
     setHiddenLayers(depth);
     const hiddenSizes = Array.from({ length: depth }, (_, i) => Math.max(4, 12 - i * 2));
-    setAgent(new RLAgent(hiddenSizes));
+    setAgent(new RLAgent(hiddenSizes, activationFunction));
+    resetEpisode();
+    setMetrics([]);
+    setCurrentEpisode(1);
+    setIsRunning(false);
+  };
+
+  const handleActivationChange = (newActivation: ActivationFunction) => {
+    setActivationFunction(newActivation);
+    const hiddenSizes = Array.from({ length: hiddenLayers }, (_, i) => Math.max(4, 12 - i * 2));
+    setAgent(new RLAgent(hiddenSizes, newActivation));
+    resetEpisode();
+    setMetrics([]);
+    setCurrentEpisode(1);
+    setIsRunning(false);
+  };
+
+  const handleRewardChange = (newReward: RewardFunction) => {
+    setRewardFunction(newReward);
     resetEpisode();
     setMetrics([]);
     setCurrentEpisode(1);
@@ -115,15 +172,11 @@ export default function App() {
     
     // Train on previous transition
     if (lastStateRef.current !== null && lastActionRef.current !== null && lastStateRef.current.length >= 6) {
-      let reward = -1;
-      if (mPos.y > (lastStateRef.current[5] * maze.height)) {
-        reward += 2;
-      }
-      if (mPos.y === maze.height - 1) {
-        reward += 500;
-      }
+      const previousY = lastStateRef.current[5] * maze.height;
+      const isGoal = mPos.y === maze.height - 1;
+      const reward = calculateReward(mPos.y, previousY, isGoal, false, maze.height);
 
-      agent.update(lastStateRef.current, lastActionRef.current, reward, state, mPos.y === maze.height - 1);
+      agent.update(lastStateRef.current, lastActionRef.current, reward, state, isGoal);
       stateRef.current.episodeReward += reward;
       setEpisodeReward(stateRef.current.episodeReward);
     }
@@ -149,8 +202,9 @@ export default function App() {
       setMousePos(stateRef.current.mousePos);
       setMouseDir(nextDir);
     } else {
-      agent.update(state, action, -5, state, false);
-      stateRef.current.episodeReward -= 5;
+      const collisionReward = calculateReward(mPos.y, mPos.y, false, true, maze.height);
+      agent.update(state, action, collisionReward, state, false);
+      stateRef.current.episodeReward += collisionReward;
       setEpisodeReward(stateRef.current.episodeReward);
     }
 
@@ -174,7 +228,7 @@ export default function App() {
       setCurrentEpisode(stateRef.current.currentEpisode);
       resetEpisode();
     }
-  }, [agent, maze, resetEpisode]);
+  }, [agent, maze, resetEpisode, calculateReward]);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -234,6 +288,52 @@ export default function App() {
               onChange={(e) => handleDepthChange(Number(e.target.value))}
               className="w-full accent-amber-500"
             />
+          </div>
+
+          {/* Activation Function Selector */}
+          <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800/50 space-y-3">
+            <div className="flex items-center gap-2 text-zinc-400 mb-1">
+              <Zap size={14} />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Activation</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {(['tanh', 'relu', 'sigmoid'] as ActivationFunction[]).map((act) => (
+                <button
+                  key={act}
+                  onClick={() => handleActivationChange(act)}
+                  className={`py-2 px-2 rounded-lg text-[9px] font-bold uppercase transition-all border ${
+                    activationFunction === act 
+                      ? 'bg-amber-500/10 border-amber-500 text-amber-500' 
+                      : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700'
+                  }`}
+                >
+                  {ACTIVATION_CONFIG[act]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Reward Function Selector */}
+          <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800/50 space-y-3">
+            <div className="flex items-center gap-2 text-zinc-400 mb-1">
+              <Zap size={14} />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Reward</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {(['standard', 'sparse', 'shaping'] as RewardFunction[]).map((reward) => (
+                <button
+                  key={reward}
+                  onClick={() => handleRewardChange(reward)}
+                  className={`py-2 px-2 rounded-lg text-[9px] font-bold uppercase transition-all border ${
+                    rewardFunction === reward 
+                      ? 'bg-amber-500/10 border-amber-500 text-amber-500' 
+                      : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700'
+                  }`}
+                >
+                  {REWARD_CONFIG[reward]}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Speed & Play Controls */}
@@ -312,20 +412,56 @@ export default function App() {
           
           {/* Reward Function Logic (Moved here to fill space) */}
           <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800/50">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-3">Reward System</h3>
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-3">Reward: {REWARD_CONFIG[rewardFunction]}</h3>
             <div className="grid grid-cols-3 gap-2">
-              <div className="p-2 rounded bg-zinc-950 border border-emerald-500/20">
-                <div className="text-[10px] font-bold text-emerald-500">+2.0</div>
-                <div className="text-[8px] text-zinc-600 uppercase">Progress</div>
-              </div>
-              <div className="p-2 rounded bg-zinc-950 border border-blue-500/20">
-                <div className="text-[10px] font-bold text-blue-500">-1.0</div>
-                <div className="text-[8px] text-zinc-600 uppercase">Step</div>
-              </div>
-              <div className="p-2 rounded bg-zinc-950 border border-red-500/20">
-                <div className="text-[10px] font-bold text-red-500">-5.0</div>
-                <div className="text-[8px] text-zinc-600 uppercase">Wall</div>
-              </div>
+              {rewardFunction === 'standard' && (
+                <>
+                  <div className="p-2 rounded bg-zinc-950 border border-emerald-500/20">
+                    <div className="text-[10px] font-bold text-emerald-500">+2.0</div>
+                    <div className="text-[8px] text-zinc-600 uppercase">Progress</div>
+                  </div>
+                  <div className="p-2 rounded bg-zinc-950 border border-blue-500/20">
+                    <div className="text-[10px] font-bold text-blue-500">-1.0</div>
+                    <div className="text-[8px] text-zinc-600 uppercase">Step</div>
+                  </div>
+                  <div className="p-2 rounded bg-zinc-950 border border-red-500/20">
+                    <div className="text-[10px] font-bold text-red-500">-5.0</div>
+                    <div className="text-[8px] text-zinc-600 uppercase">Wall</div>
+                  </div>
+                </>
+              )}
+              {rewardFunction === 'sparse' && (
+                <>
+                  <div className="p-2 rounded bg-zinc-950 border border-emerald-500/20">
+                    <div className="text-[10px] font-bold text-emerald-500">+1.0</div>
+                    <div className="text-[8px] text-zinc-600 uppercase">Progress</div>
+                  </div>
+                  <div className="p-2 rounded bg-zinc-950 border border-blue-500/20">
+                    <div className="text-[10px] font-bold text-blue-500">0.0</div>
+                    <div className="text-[8px] text-zinc-600 uppercase">Step</div>
+                  </div>
+                  <div className="p-2 rounded bg-zinc-950 border border-red-500/20">
+                    <div className="text-[10px] font-bold text-red-500">-1.0</div>
+                    <div className="text-[8px] text-zinc-600 uppercase">Wall</div>
+                  </div>
+                </>
+              )}
+              {rewardFunction === 'shaping' && (
+                <>
+                  <div className="p-2 rounded bg-zinc-950 border border-amber-500/20">
+                    <div className="text-[10px] font-bold text-amber-500">+500</div>
+                    <div className="text-[8px] text-zinc-600 uppercase">Goal</div>
+                  </div>
+                  <div className="p-2 rounded bg-zinc-950 border border-purple-500/20">
+                    <div className="text-[10px] font-bold text-purple-500">+2/-1</div>
+                    <div className="text-[8px] text-zinc-600 uppercase">Shaped</div>
+                  </div>
+                  <div className="p-2 rounded bg-zinc-950 border border-red-500/20">
+                    <div className="text-[10px] font-bold text-red-500">-5.0</div>
+                    <div className="text-[8px] text-zinc-600 uppercase">Wall</div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

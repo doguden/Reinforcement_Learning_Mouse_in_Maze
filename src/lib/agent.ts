@@ -1,15 +1,32 @@
+import { ActivationFunction } from '../types';
+
+// Activation functions
+const activationFunctions = {
+  tanh: (x: number) => Math.tanh(x),
+  relu: (x: number) => Math.max(0, x),
+  sigmoid: (x: number) => 1 / (1 + Math.exp(-x))
+};
+
+const activationDerivatives = {
+  tanh: (activation: number) => 1 - activation * activation,
+  relu: (activation: number) => activation > 0 ? 1 : 0,
+  sigmoid: (activation: number) => activation * (1 - activation)
+};
+
 export class NeuralNetwork {
   inputSize: number;
-  layerSizes: number[]; // Sizes of all layers including input and output
+  layerSizes: number[];
   outputSize: number;
+  activationType: ActivationFunction;
 
-  weights: number[][][]; // weights[layerIndex][fromNeuron][toNeuron]
-  biases: number[][]; // biases[layerIndex][neuronIndex]
-  activations: number[][]; // activations[layerIndex][neuronIndex]
+  weights: number[][][];
+  biases: number[][];
+  activations: number[][];
 
-  constructor(inputSize: number, hiddenSizes: number[], outputSize: number) {
+  constructor(inputSize: number, hiddenSizes: number[], outputSize: number, activationType: ActivationFunction = 'tanh') {
     this.inputSize = inputSize;
     this.outputSize = outputSize;
+    this.activationType = activationType;
     this.layerSizes = [inputSize, ...hiddenSizes, outputSize];
 
     this.weights = [];
@@ -27,7 +44,6 @@ export class NeuralNetwork {
       this.biases.push(Array(toSize).fill(0));
     }
 
-    // Initialize activations with zeros
     for (let i = 0; i < this.layerSizes.length; i++) {
       this.activations.push(Array(this.layerSizes[i]).fill(0));
     }
@@ -35,6 +51,7 @@ export class NeuralNetwork {
 
   forward(inputs: number[]): number[] {
     this.activations[0] = [...inputs];
+    const activationFn = activationFunctions[this.activationType];
 
     for (let i = 0; i < this.weights.length; i++) {
       const fromActivations = this.activations[i];
@@ -49,7 +66,7 @@ export class NeuralNetwork {
         for (let from = 0; from < fromActivations.length; from++) {
           sum += fromActivations[from] * layerWeights[from][to];
         }
-        nextActivations[to] = isOutputLayer ? sum : Math.tanh(sum);
+        nextActivations[to] = isOutputLayer ? sum : activationFn(sum);
       }
       this.activations[i + 1] = nextActivations;
     }
@@ -60,8 +77,8 @@ export class NeuralNetwork {
   train(inputs: number[], targetQ: number[], learningRate: number) {
     const outputs = this.forward(inputs);
     const layerCount = this.layerSizes.length;
+    const activationDerivative = activationDerivatives[this.activationType];
     
-    // Errors for each layer
     const errors: number[][] = Array.from({ length: layerCount }, (_, i) => Array(this.layerSizes[i]).fill(0));
 
     // Output layer error
@@ -80,7 +97,7 @@ export class NeuralNetwork {
         for (let k = 0; k < this.layerSizes[i + 1]; k++) {
           error += nextErrors[k] * layerWeights[j][k];
         }
-        errors[i][j] = error * (1 - layerActivations[j] * layerActivations[j]); // tanh derivative
+        errors[i][j] = error * activationDerivative(layerActivations[j]);
       }
     }
 
@@ -109,9 +126,8 @@ export class RLAgent {
   epsilon = 0.2;
   learningRate = 0.01;
 
-  constructor(hiddenSizes: number[] = [12, 8]) {
-    // Inputs: WallU, WallD, WallL, WallR, NormX, NormY
-    this.nn = new NeuralNetwork(6, hiddenSizes, 4);
+  constructor(hiddenSizes: number[] = [12, 8], activationType: ActivationFunction = 'tanh') {
+    this.nn = new NeuralNetwork(6, hiddenSizes, 4, activationType);
   }
 
   getAction(state: number[]): number {

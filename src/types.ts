@@ -7,6 +7,9 @@ export type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 
 export type Difficulty = 'NOVICE' | 'BEGINNER' | 'EASY' | 'MEDIUM' | 'HARD' | 'INSANE';
 
+export type ActivationFunction = 'tanh' | 'relu' | 'sigmoid';
+export type RewardFunction = 'standard' | 'sparse' | 'shaping';
+
 export interface MazeConfig {
   width: number;
   height: number;
