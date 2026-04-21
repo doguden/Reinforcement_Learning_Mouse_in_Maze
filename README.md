@@ -47,5 +47,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 -Test RNNs, LSTMs.
 
--
+-Add a measure of Entropy instead of reward
 
